@@ -25,7 +25,7 @@ class TemporadaController extends Controller
         ]);
         //
         Temporada::create([
-            'nombretemporada' => $request->nombretemporada
+            'NombreTemporada' => $request->nombretemporada
         ]);
 
 

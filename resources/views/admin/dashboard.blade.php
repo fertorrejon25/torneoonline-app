@@ -16,11 +16,14 @@
     @elseif ($section === 'temporadacargadas')
         <h4>Temporadas cargadas</h4>
         @if(count($temporadas) > 0)
-            <ul class="list-group">
+            <div class="d-grid gap-2">
                 @foreach ($temporadas as $temp)
-                    <li class="list-group-item">{{ $temp->NombreTemporada}}</li>
+                    <a href="#"
+                    class="btn btn-outline-primary">
+                    {{ $temp->NombreTemporada }}
+                    </a>
                 @endforeach
-            </ul>
+            </div>
         @else
             <p>No hay temporadas registradas.</p>
         @endif
