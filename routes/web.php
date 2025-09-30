@@ -6,8 +6,11 @@ use App\Http\Controllers\JugadorController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TemporadaController;
+use App\Http\Controllers\PartidosController;
+use App\Http\Controllers\FechaController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -44,8 +47,13 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::post('/admin/temporada/nueva', [TemporadaController::class, 'store'])->name('temporada.store');
     // para mostras las temporadas creadas
     Route::get('/admin/{section?}', [AdminController::class, 'dashboard'])->name('temporadacargadas.dashboard');
+    //para la carga de temporada
+    Route::get('/admin/temporada/{id}', [TemporadaController::class, 'show'])->name('admin.temporada.show')->middleware('auth');
 
 });
+//para la vista de las temporadas 
+Route::resource('temporada', TemporadaController::class);
+
 
 // Otras vistas del menú
 // Route::get('/admin/ranking/', function () {
@@ -79,6 +87,12 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
 
 Route::get('/admin/jugadores/crear', [JugadorController::class, 'create'])->name('jugadores.create');
 Route::post('/admin/jugadores', [JugadorController::class, 'store'])->name('jugadores.store');
+/****** para armar fixture de temporadas*************************************/
+Route::prefix('temporadas')->group(function () {
+    Route::get('{id}/fixture', [PartidosController::class, 'index'])->name('fixture.index');
+    Route::post('{id}/fixture/generar', [PartidosController::class, 'generar'])->name('fixture.generar');
+    Route::post('{id}/fixture/fechas', [PartidosController::class, 'updateFechas'])->name('fixture.updateFechas');
+});
 
 require __DIR__.'/auth.php';
 

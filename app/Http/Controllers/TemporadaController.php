@@ -8,9 +8,14 @@ use App\Models\Temporada;
 
 class TemporadaController extends Controller
 {
+   
+
     public function create()
     {
-        return view('admin.temporada_nueva'); // Muestra el formulario
+        // Traer todas las temporadas para mostrarlas en la vista
+        $temporadas = \App\Models\Temporada::orderBy('created_at','desc')->get();
+
+        return view('admin.temporada_nueva', compact('temporadas'));
     }
 
     public function store(Request $request)
@@ -20,10 +25,7 @@ class TemporadaController extends Controller
             'nombretemporada' => 'required|string|max:255',
         ]);
         // Insertar en la base de datos
-        DB::table('temporadas')->insert([
-            'NombreTemporada' => $request->input('nombretemporada'),
-        ]);
-        //
+        
         Temporada::create([
             'NombreTemporada' => $request->nombretemporada
         ]);
@@ -37,6 +39,14 @@ class TemporadaController extends Controller
     {
         $temporadas = Temporada::orderBy('created_at', 'desc')->get();
         return view('admin.temporada_nueva', compact('temporadas'));
+    }
+    //****************para la carga de temporada****************** */
+    public function show($id)
+    {
+        // Cargamos la temporada con sus fechas y partidos
+        $temporada = Temporada::with('fechas.partidos')->findOrFail($id);
+
+        return view('admin.temporada_detalle', compact('temporada'));
     }
    
 }

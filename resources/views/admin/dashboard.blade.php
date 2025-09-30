@@ -18,7 +18,7 @@
         @if(count($temporadas) > 0)
             <div class="d-grid gap-2">
                 @foreach ($temporadas as $temp)
-                    <a href="#"
+                    <a href="{{ route('admin.temporada.show', $temp->id) }}"
                     class="btn btn-outline-primary">
                     {{ $temp->NombreTemporada }}
                     </a>
