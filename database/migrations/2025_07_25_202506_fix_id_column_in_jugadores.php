@@ -14,7 +14,13 @@ return new class extends Migration
     public function up()
     {
         Schema::table('jugadores', function (Blueprint $table) {
-            $table->id()->change();
+            // Borrar la columna id actual
+            $table->dropColumn('id');
+        });
+
+        Schema::table('jugadores', function (Blueprint $table) {
+            // Volver a crear la columna id como autoIncrement
+            $table->id();
         });
     }
 
@@ -26,7 +32,12 @@ return new class extends Migration
     public function down()
     {
         Schema::table('jugadores', function (Blueprint $table) {
-            //
+            $table->dropColumn('id');
+        });
+
+        Schema::table('jugadores', function (Blueprint $table) {
+            // Restaurar como entero simple si lo querés así
+            $table->integer('id');
         });
     }
 };

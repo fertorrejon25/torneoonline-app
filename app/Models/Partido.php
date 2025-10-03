@@ -7,10 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class Partido extends Model
 {
-    use HasFactory;
-
-    protected $fillable = [
+        protected $fillable = [
         'temporada_id',
+        'fecha_id',
         'equipo_local_id',
         'equipo_visitante_id',
         'goles_local',
@@ -18,6 +17,13 @@ class Partido extends Model
         'fecha',
         'hora',
     ];
+
+
+    public function fecha()
+    {
+        return $this->belongsTo(Fecha::class, 'fecha_id');
+    }
+
 
     public function temporada()
     {
@@ -33,5 +39,16 @@ class Partido extends Model
     {
         return $this->belongsTo(Equipo::class, 'equipo_visitante_id');
     }
+    /**para los partidos visitante y local */
+    public function equipoLocal()
+    {
+        return $this->belongsTo(Equipo::class, 'equipo_local_id');
+    }
+
+    public function equipoVisitante()
+    {
+        return $this->belongsTo(Equipo::class, 'equipo_visitante_id');
+    }
+    /************************************* */
 }
 

@@ -13,63 +13,50 @@ class PartidosController extends Controller
     {
         $temporada = Temporada::findOrFail($temporadaId);
         $partidos = Partido::where('temporada_id', $temporadaId)
-                            ->with(['local','visitante'])
-                            ->get()
-                            ->groupBy(function($p){ return $p->created_at->format('Y-m-d'); });
+                            ->with(['equipoLocal','equipoVisitante','fecha'])
+                            ->get();
 
-        return view('temporadas.fixture', compact('temporada','partidos'));
+        return view('admin.fixture.index', compact('temporada', 'partidos'));
     }
 
     public function generar($temporadaId)
     {
-        $equipos = Equipo::pluck('id')->toArray();
-        $fixture = $this->roundRobin($equipos);
-
-        foreach ($fixture as $ronda) {
-            foreach ($ronda as [$local, $visitante]) {
-                Partido::create([
-                    'temporada_id' => $temporadaId,
-                    'equipo_local_id' => $local,
-                    'equipo_visitante_id' => $visitante,
-                ]);
-            }
-        }
-
-        return redirect()->route('fixture.index', $temporadaId)
-                         ->with('success','Fixture generado correctamente');
+        // implementación existente o placeholder
+        return back();
     }
 
-    public function updateFechas(Request $request, $temporadaId)
+    public function updateFechas($temporadaId)
     {
-        foreach ($request->fechas as $id => $fecha) {
-            Partido::where('id',$id)->update([
-                'fecha' => $fecha,
-                'hora' => $request->horas[$id] ?? null
-            ]);
-        }
-        return back()->with('success','Fechas y horarios actualizados');
+        // placeholder
+        return back();
     }
 
-    private function roundRobin($equipos)
+    public function store(Request $request)
     {
-        $count = count($equipos);
-        if ($count % 2) { $equipos[] = null; $count++; }
-        $rondas = $count - 1;
-        $partidosPorRonda = $count / 2;
-        $fixture = [];
+        $request->validate([
+            'fecha_id' => 'required|exists:fechas,id',
+            'equipo_local' => 'required|exists:equipos,id',
+            'equipo_visitante' => 'required|exists:equipos,id|different:equipo_local',
+            'goles_local' => 'nullable|integer',
+            'goles_visitante' => 'nullable|integer',
+            'fecha' => 'nullable|date',
+            'hora' => 'nullable'
+        ]);
 
-        for ($ronda = 0; $ronda < $rondas; $ronda++) {
-            for ($i = 0; $i < $partidosPorRonda; $i++) {
-                $local = $equipos[$i];
-                $visitante = $equipos[$count - 1 - $i];
-                if ($local && $visitante) {
-                    $fixture[$ronda][] = [$local, $visitante];
-                }
-            }
-            $primer = array_splice($equipos, 1, 1)[0];
-            array_push($equipos, $primer);
-        }
+        // map incoming field names to DB column names expected by the model
+        $data = [
+            'fecha_id' => $request->input('fecha_id'),
+            'equipo_local_id' => $request->input('equipo_local'),
+            'equipo_visitante_id' => $request->input('equipo_visitante'),
+            'goles_local' => $request->input('goles_local'),
+            'goles_visitante' => $request->input('goles_visitante'),
+            'fecha' => $request->input('fecha'),
+            'hora' => $request->input('hora'),
+            'temporada_id' => $request->input('temporada_id') ?? null,
+        ];
 
-        return $fixture;
+        Partido::create($data);
+
+        return back()->with('success', 'Partido agregado correctamente.');
     }
 }

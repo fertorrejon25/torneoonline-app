@@ -46,7 +46,9 @@ class TemporadaController extends Controller
         // Cargamos la temporada con sus fechas y partidos
         $temporada = Temporada::with('fechas.partidos')->findOrFail($id);
 
-        return view('admin.temporada_detalle', compact('temporada'));
+        $equipos = \App\Models\Equipo::orderBy('NombreEquipos')->get();
+
+        return view('admin.temporada_detalle', compact('temporada', 'equipos'));
     }
    
 }

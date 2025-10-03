@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\JugadorController;
+use App\Http\Controllers\EquipoController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\TemporadaController;
@@ -65,7 +66,7 @@ Route::middleware(['auth', 'role:user'])->group(function () {
     Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
 });
 /*********para la tabla equipos */
-use App\Http\Controllers\EquipoController;
+
 
 Route::post('/equipos', [EquipoController::class, 'store'])->name('equipos.store');
 /********************************************************************************************** */
@@ -93,6 +94,14 @@ Route::prefix('temporadas')->group(function () {
     Route::post('{id}/fixture/generar', [PartidosController::class, 'generar'])->name('fixture.generar');
     Route::post('{id}/fixture/fechas', [PartidosController::class, 'updateFechas'])->name('fixture.updateFechas');
 });
+
+// ********para fechas*************//
+Route::post('/fechas/store', [FechaController::class, 'store'])
+    ->name('fechas.store');
+
+// ********para partidos ************/
+Route::post('/partidos/store', [PartidosController::class, 'store'])
+    ->name('partidos.store');
 
 require __DIR__.'/auth.php';
 
