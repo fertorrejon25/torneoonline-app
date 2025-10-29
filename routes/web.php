@@ -11,119 +11,109 @@ use App\Http\Controllers\PartidosController;
 use App\Http\Controllers\FechaController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ResultadoController;
+use App\Http\Controllers\RankingController;
 
-
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
-
+// Ruta principal - Login
 Route::get('/', function () {
     return view('auth.login');
 });
 
-/*Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');*/
+// ==========================================
+// RUTAS PÚBLICAS
+// ==========================================
+Route::get('/ranking', [RankingController::class, 'index'])->name('ranking.index');
+Route::get('/ranking/{temporada}', [RankingController::class, 'show'])->name('ranking.show');
 
+// ==========================================
+// RUTAS DE AUTENTICACIÓN
+// ==========================================
 Route::middleware('auth')->group(function () {
+    // Perfil de usuario
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Redirección por rol
+    Route::get('/redirigir-por-rol', function () {
+        $user = Auth::user();
+        if ($user->role === 'admin') {
+            return redirect()->route('admin.dashboard');
+        }
+        return redirect()->route('user.dashboard');
+    })->name('redirigir.por.rol');
+
+    // Logout
+    Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 });
-/*** ruta y vista para el panel de admin y user*/
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
 
-    Route::resource('jugadores', JugadorController::class);
-
-    // Rutas para crear nueva temporada
-    Route::get('/admin/temporada/nueva', [TemporadaController::class, 'create'])->name('temporada.create');
-    Route::post('/admin/temporada/nueva', [TemporadaController::class, 'store'])->name('temporada.store');
-    // para mostras las temporadas creadas
-    Route::get('/admin/{section?}', [AdminController::class, 'dashboard'])->name('temporadacargadas.dashboard');
-    //para la carga de temporada
-    Route::get('/admin/temporada/{id}', [TemporadaController::class, 'show'])->name('admin.temporada.show')->middleware('auth');
-
-});
-//para la vista de las temporadas 
-Route::resource('temporada', TemporadaController::class);
-
-
-// Otras vistas del menú
-// Route::get('/admin/ranking/', function () {
-// return view('admin.ranking_dashboard'); // creás este archivo si lo necesitás
-// })->name('ranking.dashboard');
-// /});
-
+// ==========================================
+// RUTAS DE USUARIO NORMAL
+// ==========================================
 Route::middleware(['auth', 'role:user'])->group(function () {
     Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
 });
-/*********para la tabla equipos */
 
+// ==========================================
+// RUTAS DE ADMINISTRADOR
+// ==========================================
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
 
-Route::post('/equipos', [EquipoController::class, 'store'])->name('equipos.store');
-/********************************************************************************************** */
-Route::get('/redirigir-por-rol', function () {
-    $user = Auth::user();
+    // Dashboard y estadísticas
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::get('/maximos-goleadores', [AdminController::class, 'maximosGoleadores'])->name('admin.maximos_goleadores');
+    Route::get('/maximos-asistentes', [AdminController::class, 'maximosAsistentes'])->name('admin.maximos_asistentes');
+    Route::get('/ranking', [RankingController::class, 'index'])->name('admin.ranking');
+    Route::get('/temporadas', [AdminController::class, 'administrarTemporada'])->name('admin.temporadas');
 
-    if ($user->role === 'admin') {
-        return redirect()->route('admin.dashboard');
-    }
+    // Temporadas
+    Route::get('/temporada/nueva', [TemporadaController::class, 'create'])->name('temporada.create');
+    Route::post('/temporada/nueva', [TemporadaController::class, 'store'])->name('temporada.store');
+    Route::post('/temporada/store', [AdminController::class, 'storeTemporadaDesdeDashboard'])->name('admin.temporada.store');
+    Route::get('/temporada/{temporada}', [TemporadaController::class, 'show'])->name('admin.temporada.show');
+    Route::resource('temporada', TemporadaController::class)->except(['create', 'store', 'show']);
 
-    return redirect()->route('user.dashboard');
-})->name('redirigir.por.rol');
-
-/* esto deve enviar un post ** */
-/* Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout'); */
-Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
-    ->middleware('auth')
-    ->name('logout');
-
-Route::get('/admin/jugadores/crear', [JugadorController::class, 'create'])->name('jugadores.create');
-Route::post('/admin/jugadores', [JugadorController::class, 'store'])->name('jugadores.store');
-/****** para armar fixture de temporadas*************************************/
-Route::prefix('temporadas')->group(function () {
-    Route::get('{id}/fixture', [PartidosController::class, 'index'])->name('fixture.index');
-    Route::post('{id}/fixture/generar', [PartidosController::class, 'generar'])->name('fixture.generar');
-    Route::post('{id}/fixture/fechas', [PartidosController::class, 'updateFechas'])->name('fixture.updateFechas');
-});
-
-// ********para fechas*************//
-Route::post('/fechas/store', [FechaController::class, 'store'])
-    ->name('fechas.store');
-
-// ********para partidos ************/
-Route::post('/partidos/store', [PartidosController::class, 'store'])
-    ->name('partidos.store');
-
-Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/admin/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    // Jugadores
+    Route::get('/jugadores/crear', [JugadorController::class, 'create'])->name('jugadores.create');
+    Route::post('/jugadores', [JugadorController::class, 'store'])->name('jugadores.store');
     Route::resource('jugadores', JugadorController::class);
 
-    // Rutas para crear nueva temporada
-    Route::get('/admin/temporada/nueva', [TemporadaController::class, 'create'])->name('temporada.create');
-    Route::post('/admin/temporada/nueva', [TemporadaController::class, 'store'])->name('temporada.store');
+    // Equipos
+    Route::post('/equipos', [EquipoController::class, 'store'])->name('equipos.store');
 
-    // Para mostrar las temporadas creadas
-    Route::get('/admin/{section?}', [AdminController::class, 'dashboard'])->name('temporadacargadas.dashboard');
+    // Fechas
+    Route::post('/fechas/store', [FechaController::class, 'store'])->name('fechas.store');
+    Route::delete('/fechas/{id}', [FechaController::class, 'destroy'])->name('fechas.destroy');
 
-    // Para ver una temporada específica
-    Route::get('/admin/temporada/{id}', [TemporadaController::class, 'show'])
-        ->name('admin.temporada.show')
-        ->middleware('auth');
+    // ==========================================
+    // RUTAS DE PARTIDOS - ORDEN CORRECTO
+    // ==========================================
+    Route::prefix('partidos')->group(function () {
+        // Crear partido
+        Route::post('/store', [PartidosController::class, 'store'])->name('partidos.store');
 
-    // 🔹 NUEVA RUTA PARA RESULTADOS
-    Route::get('/admin/resultados', [ResultadoController::class, 'index'])->name('resultados.index');
+        // Edición detallada - ESTA ES LA RUTA QUE DEBES USAR PARA VER EL FORMULARIO
+        Route::get('/{partido}/edit_detailed', [PartidosController::class, 'editDetailed'])
+            ->name('admin.partidos.edit_detailed');
+
+        // Actualización detallada - ESTA RUTA SOLO ACEPTA PUT PARA ENVIAR EL FORMULARIO
+        Route::put('/{partido}/update_detailed', [PartidosController::class, 'updateDetailed'])
+            ->name('admin.partidos.update_detailed');
+
+        // Eliminar partido
+        Route::delete('/{partido}', [PartidosController::class, 'destroy'])
+            ->name('partidos.destroy');
+
+        // Limpiar partidos
+        Route::delete('/limpiar/{temporadaId}', [PartidosController::class, 'limpiarPartidos'])
+            ->name('partidos.limpiar');
+    });
+
+    // ==========================================
+    // OTRAS RUTAS ESPECÍFICAS (agrega aquí cualquier otra ruta específica)
+    // ==========================================
+
+    // ⚠️ RUTA COMODÍN - DEBE SER SIEMPRE LA ÚLTIMA
+    Route::get('/{section?}', [AdminController::class, 'dashboard'])->name('admin.catchall');
 });
 
-require __DIR__.'/auth.php';
-
+require __DIR__ . '/auth.php';

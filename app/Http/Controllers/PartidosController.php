@@ -2,216 +2,345 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Equipo;
 use App\Models\Partido;
-use App\Models\Temporada;
-use App\Models\Resultado;
+use App\Models\Fecha;
+use App\Models\EquipoEstadisticaTemporada;
+use App\Models\JugadorEstadisticaTemporada;
 use Illuminate\Http\Request;
 
 class PartidosController extends Controller
 {
-    public function index($temporadaId)
+    /**
+     * ==========================================
+     * MUESTRA EL FORMULARIO DE EDICIÓN DETALLADA
+     * ==========================================
+     */
+    public function editDetailed($id)
     {
-        $temporada = Temporada::findOrFail($temporadaId);
-        $partidos = Partido::where('temporada_id', $temporadaId)
-                            ->with(['equipoLocal','equipoVisitante','fecha'])
-                            ->get();
+        $partido = Partido::with([
+            'equipoLocal.jugadores.user',
+            'equipoVisitante.jugadores.user',
+            'fecha'
+        ])->findOrFail($id);
 
-        return view('admin.fixture.index', compact('temporada', 'partidos'));
-    }
+        $estadisticasPartido = [];
+        $temporada_id = optional($partido->fecha)->temporada_id ?? $partido->temporada_id;
 
-    public function generar($temporadaId)
-    {
-        // implementación existente o placeholder
-        return back();
-    }
+        // Obtener todos los jugadores
+        $jugadoresLocal = $partido->equipoLocal->jugadores;
+        $jugadoresVisitante = $partido->equipoVisitante->jugadores;
+        $todosLosJugadores = $jugadoresLocal->merge($jugadoresVisitante);
 
-    public function updateFechas($temporadaId)
-    {
-        // placeholder
-        return back();
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'fecha_id' => 'required|exists:fechas,id',
-            'equipo_local' => 'required|exists:equipos,id',
-            'equipo_visitante' => 'required|exists:equipos,id|different:equipo_local',
-            'goles_local' => 'nullable|integer|min:0',
-            'goles_visitante' => 'nullable|integer|min:0',
-            'fecha' => 'nullable|date',
-            'hora' => 'nullable|date_format:H:i'
-        ]);
-
-        // Mapear campos del formulario a nombres de columnas
-        $data = [
-            'fecha_id' => $request->input('fecha_id'),
-            'equipo_local_id' => $request->input('equipo_local'),
-            'equipo_visitante_id' => $request->input('equipo_visitante'),
-            'goles_local' => $request->input('goles_local'),
-            'goles_visitante' => $request->input('goles_visitante'),
-            'fecha' => $request->input('fecha'),
-            'hora' => $request->input('hora'),
-            'temporada_id' => $request->input('temporada_id') ?? null,
-        ];
-
-        $partido = Partido::create($data);
-
-        // Si el partido tiene resultado, actualizar estadísticas
-        if ($partido->goles_local !== null && $partido->goles_visitante !== null) {
-            $this->actualizarEstadisticas($partido);
+        // Por defecto, todas las estadísticas en 0
+        // (No podemos saber qué hizo cada jugador en este partido específico sin tabla intermedia)
+        foreach ($todosLosJugadores as $jugador) {
+            $estadisticasPartido[$jugador->id] = [
+                'jugo' => false,
+                'goles' => 0,
+                'asistencias' => 0,
+            ];
         }
 
-        return back()->with('success', 'Partido agregado correctamente.');
+        return view('admin.partidos.edit_detailed', compact('partido', 'estadisticasPartido'));
     }
 
     /**
-     * Actualizar el resultado de un partido existente
+     * ==========================================
+     * ACTUALIZA EL PARTIDO DETALLADAMENTE
+     * ==========================================
      */
-    public function updateResultado(Request $request, $id)
+    public function updateDetailed(Request $request, $id)
     {
-        $request->validate([
-            'goles_local' => 'required|integer|min:0',
-            'goles_visitante' => 'required|integer|min:0',
-        ]);
-
         $partido = Partido::findOrFail($id);
+        $temporada_id = optional($partido->fecha)->temporada_id ?? $partido->temporada_id;
+
+        // Guardar resultado anterior
+        $goles_local_anterior = $partido->goles_local;
+        $goles_visitante_anterior = $partido->goles_visitante;
         
-        // Guardar valores anteriores para revertir estadísticas si es necesario
-        $golesLocalAnterior = $partido->goles_local;
-        $golesVisitanteAnterior = $partido->goles_visitante;
+        // Detectar si el partido ya tenía resultado definido
+        $yaDefinido = ($goles_local_anterior !== null && $goles_visitante_anterior !== null);
 
-        // Actualizar el partido
-        $partido->goles_local = $request->goles_local;
-        $partido->goles_visitante = $request->goles_visitante;
-        $partido->save();
+        // Jugadores del formulario (incluye datos nuevos y anteriores)
+        $jugadores = $request->input('jugadores', []);
 
-        // Si había resultado anterior, revertir estadísticas
-        if ($golesLocalAnterior !== null && $golesVisitanteAnterior !== null) {
-            $this->revertirEstadisticas($partido, $golesLocalAnterior, $golesVisitanteAnterior);
+        // PASO 1: Si ya estaba definido, REVERTIR estadísticas previas
+        if ($yaDefinido) {
+            $this->revertirEstadisticasEquipos($partido, $goles_local_anterior, $goles_visitante_anterior);
+            $this->revertirEstadisticasJugadores($jugadores, $temporada_id);
         }
 
-        // Aplicar nuevas estadísticas
-        $this->actualizarEstadisticas($partido);
+        // PASO 2: Actualizar resultado del partido
+        $partido->update([
+            'goles_local' => $request->input('goles_local', 0),
+            'goles_visitante' => $request->input('goles_visitante', 0),
+        ]);
 
-        return back()->with('success', 'Resultado actualizado correctamente.');
+        // PASO 3: Aplicar nuevas estadísticas
+        $this->aplicarEstadisticasJugadores($jugadores, $temporada_id);
+        $this->aplicarEstadisticasEquipos($partido);
+
+        return redirect()
+            ->route('admin.temporada.show', $temporada_id)
+            ->with('success', 'Estadísticas y resultado actualizados correctamente.');
     }
 
     /**
-     * Actualizar las estadísticas cuando se guarda un resultado
+     * ==========================================
+     * REVIERTE ESTADÍSTICAS DE JUGADORES
+     * ==========================================
      */
-    private function actualizarEstadisticas(Partido $partido)
+    private function revertirEstadisticasJugadores($jugadoresData, $temporada_id)
     {
-        // Actualizar equipo local
-        $this->actualizarEstadisticasEquipo(
-            $partido->equipo_local_id,
-            $partido->temporada_id,
-            $partido->goles_local,
-            $partido->goles_visitante
-        );
+        foreach ($jugadoresData as $jugadorId => $datos) {
+            // Solo revertir si había datos anteriores
+            if (!isset($datos['jugo_anterior']) && !isset($datos['goles_anterior']) && !isset($datos['asistencias_anterior'])) {
+                continue;
+            }
 
-        // Actualizar equipo visitante
-        $this->actualizarEstadisticasEquipo(
-            $partido->equipo_visitante_id,
-            $partido->temporada_id,
-            $partido->goles_visitante,
-            $partido->goles_local
-        );
+            $estadisticasJugador = JugadorEstadisticaTemporada::where('jugador_id', $jugadorId)
+                ->where('temporada_id', $temporada_id)
+                ->first();
+
+            if ($estadisticasJugador) {
+                // Revertir partidos jugados si había jugado antes
+                if (isset($datos['jugo_anterior']) && $datos['jugo_anterior']) {
+                    $estadisticasJugador->partidos_jugados = max(0, $estadisticasJugador->partidos_jugados - 1);
+                }
+
+                // Revertir goles y asistencias previas
+                $estadisticasJugador->goles = max(0, $estadisticasJugador->goles - intval($datos['goles_anterior'] ?? 0));
+                $estadisticasJugador->asistencias = max(0, $estadisticasJugador->asistencias - intval($datos['asistencias_anterior'] ?? 0));
+
+                $estadisticasJugador->save();
+            }
+        }
     }
 
     /**
-     * Revertir estadísticas de un resultado anterior
+     * ==========================================
+     * APLICA ESTADÍSTICAS DE JUGADORES
+     * ==========================================
      */
-    private function revertirEstadisticas(Partido $partido, $golesLocalAnt, $golesVisitanteAnt)
+    private function aplicarEstadisticasJugadores($jugadoresData, $temporada_id)
     {
-        // Revertir equipo local
-        $this->revertirEstadisticasEquipo(
-            $partido->equipo_local_id,
-            $partido->temporada_id,
-            $golesLocalAnt,
-            $golesVisitanteAnt
-        );
+        foreach ($jugadoresData as $jugadorId => $datos) {
+            $estadisticasJugador = JugadorEstadisticaTemporada::firstOrCreate(
+                [
+                    'jugador_id' => $jugadorId,
+                    'temporada_id' => $temporada_id
+                ],
+                [
+                    'partidos_jugados' => 0,
+                    'goles' => 0,
+                    'asistencias' => 0
+                ]
+            );
 
-        // Revertir equipo visitante
-        $this->revertirEstadisticasEquipo(
-            $partido->equipo_visitante_id,
-            $partido->temporada_id,
-            $golesVisitanteAnt,
-            $golesLocalAnt
-        );
+            // Sumar partidos jugados si jugó
+            if (isset($datos['jugo']) && $datos['jugo']) {
+                $estadisticasJugador->partidos_jugados += 1;
+            }
+
+            // Sumar goles y asistencias
+            $estadisticasJugador->goles += intval($datos['goles'] ?? 0);
+            $estadisticasJugador->asistencias += intval($datos['asistencias'] ?? 0);
+
+            $estadisticasJugador->save();
+        }
     }
 
     /**
-     * Actualizar estadísticas de un equipo
+     * ==========================================
+     * REVIERTE ESTADÍSTICAS DE EQUIPOS
+     * ==========================================
      */
-    private function actualizarEstadisticasEquipo($equipoId, $temporadaId, $golesFavor, $golesContra)
+    private function revertirEstadisticasEquipos($partido, $goles_local, $goles_visitante)
     {
-        $resultado = Resultado::firstOrCreate(
+        $temporada_id = optional($partido->fecha)->temporada_id ?? $partido->temporada_id;
+
+        $estadisticas_local = EquipoEstadisticaTemporada::where('equipo_id', $partido->equipo_local_id)
+            ->where('temporada_id', $temporada_id)
+            ->first();
+
+        $estadisticas_visitante = EquipoEstadisticaTemporada::where('equipo_id', $partido->equipo_visitante_id)
+            ->where('temporada_id', $temporada_id)
+            ->first();
+
+        if ($estadisticas_local && $estadisticas_visitante) {
+            // Revertir partidos jugados
+            $estadisticas_local->partidos_jugados = max(0, $estadisticas_local->partidos_jugados - 1);
+            $estadisticas_visitante->partidos_jugados = max(0, $estadisticas_visitante->partidos_jugados - 1);
+
+            // Revertir goles
+            $estadisticas_local->goles_favor = max(0, $estadisticas_local->goles_favor - $goles_local);
+            $estadisticas_local->goles_contra = max(0, $estadisticas_local->goles_contra - $goles_visitante);
+            $estadisticas_visitante->goles_favor = max(0, $estadisticas_visitante->goles_favor - $goles_visitante);
+            $estadisticas_visitante->goles_contra = max(0, $estadisticas_visitante->goles_contra - $goles_local);
+
+            // Revertir resultado
+            if ($goles_local > $goles_visitante) {
+                // Local ganó
+                $estadisticas_local->partidos_ganados = max(0, $estadisticas_local->partidos_ganados - 1);
+                $estadisticas_visitante->partidos_perdidos = max(0, $estadisticas_visitante->partidos_perdidos - 1);
+                $estadisticas_local->puntos = max(0, $estadisticas_local->puntos - 3);
+            } elseif ($goles_local < $goles_visitante) {
+                // Visitante ganó
+                $estadisticas_local->partidos_perdidos = max(0, $estadisticas_local->partidos_perdidos - 1);
+                $estadisticas_visitante->partidos_ganados = max(0, $estadisticas_visitante->partidos_ganados - 1);
+                $estadisticas_visitante->puntos = max(0, $estadisticas_visitante->puntos - 3);
+            } else {
+                // Empate
+                $estadisticas_local->partidos_empatados = max(0, $estadisticas_local->partidos_empatados - 1);
+                $estadisticas_visitante->partidos_empatados = max(0, $estadisticas_visitante->partidos_empatados - 1);
+                $estadisticas_local->puntos = max(0, $estadisticas_local->puntos - 1);
+                $estadisticas_visitante->puntos = max(0, $estadisticas_visitante->puntos - 1);
+            }
+
+            // Recalcular diferencia
+            $estadisticas_local->diferencia_goles = $estadisticas_local->goles_favor - $estadisticas_local->goles_contra;
+            $estadisticas_visitante->diferencia_goles = $estadisticas_visitante->goles_favor - $estadisticas_visitante->goles_contra;
+
+            $estadisticas_local->save();
+            $estadisticas_visitante->save();
+        }
+    }
+
+    /**
+     * ==========================================
+     * APLICA ESTADÍSTICAS DE EQUIPOS
+     * ==========================================
+     */
+    private function aplicarEstadisticasEquipos($partido)
+    {
+        $temporada_id = optional($partido->fecha)->temporada_id ?? $partido->temporada_id;
+
+        $estadisticas_local = EquipoEstadisticaTemporada::firstOrCreate(
+            ['equipo_id' => $partido->equipo_local_id, 'temporada_id' => $temporada_id],
             [
-                'equipo_id' => $equipoId,
-                'temporada_id' => $temporadaId,
-            ],
-            [
-                'partidos_jugados' => 0,
-                'partidos_ganados' => 0,
-                'partidos_empatados' => 0,
-                'partidos_perdidos' => 0,
-                'goles_favor' => 0,
-                'goles_contra' => 0,
+                'partidos_jugados' => 0, 'partidos_ganados' => 0, 'partidos_empatados' => 0,
+                'partidos_perdidos' => 0, 'goles_favor' => 0, 'goles_contra' => 0,
+                'diferencia_goles' => 0, 'puntos' => 0
             ]
         );
 
-        // Incrementar contadores
-        $resultado->partidos_jugados += 1;
-        $resultado->goles_favor += $golesFavor;
-        $resultado->goles_contra += $golesContra;
+        $estadisticas_visitante = EquipoEstadisticaTemporada::firstOrCreate(
+            ['equipo_id' => $partido->equipo_visitante_id, 'temporada_id' => $temporada_id],
+            [
+                'partidos_jugados' => 0, 'partidos_ganados' => 0, 'partidos_empatados' => 0,
+                'partidos_perdidos' => 0, 'goles_favor' => 0, 'goles_contra' => 0,
+                'diferencia_goles' => 0, 'puntos' => 0
+            ]
+        );
 
-        // Determinar resultado del partido
-        if ($golesFavor > $golesContra) {
-            $resultado->partidos_ganados += 1;
-        } elseif ($golesFavor === $golesContra) {
-            $resultado->partidos_empatados += 1;
+        // Incrementar partidos jugados
+        $estadisticas_local->partidos_jugados++;
+        $estadisticas_visitante->partidos_jugados++;
+
+        // Sumar goles
+        $estadisticas_local->goles_favor += $partido->goles_local;
+        $estadisticas_local->goles_contra += $partido->goles_visitante;
+        $estadisticas_visitante->goles_favor += $partido->goles_visitante;
+        $estadisticas_visitante->goles_contra += $partido->goles_local;
+
+        // Calcular diferencia
+        $estadisticas_local->diferencia_goles = $estadisticas_local->goles_favor - $estadisticas_local->goles_contra;
+        $estadisticas_visitante->diferencia_goles = $estadisticas_visitante->goles_favor - $estadisticas_visitante->goles_contra;
+
+        // Aplicar puntos según resultado
+        if ($partido->goles_local > $partido->goles_visitante) {
+            // ✅ Local GANA: +3 puntos
+            $estadisticas_local->partidos_ganados++;
+            $estadisticas_local->puntos += 3;
+            // ✅ Visitante PIERDE: +0 puntos
+            $estadisticas_visitante->partidos_perdidos++;
+        } elseif ($partido->goles_local < $partido->goles_visitante) {
+            // ✅ Visitante GANA: +3 puntos
+            $estadisticas_visitante->partidos_ganados++;
+            $estadisticas_visitante->puntos += 3;
+            // ✅ Local PIERDE: +0 puntos
+            $estadisticas_local->partidos_perdidos++;
         } else {
-            $resultado->partidos_perdidos += 1;
+            // ✅ EMPATE: +1 punto cada uno
+            $estadisticas_local->partidos_empatados++;
+            $estadisticas_visitante->partidos_empatados++;
+            $estadisticas_local->puntos += 1;
+            $estadisticas_visitante->puntos += 1;
         }
 
-        $resultado->save();
+        $estadisticas_local->save();
+        $estadisticas_visitante->save();
     }
 
     /**
-     * Revertir estadísticas de un equipo
+     * ==========================================
+     * CREA UN NUEVO PARTIDO
+     * ==========================================
      */
-    private function revertirEstadisticasEquipo($equipoId, $temporadaId, $golesFavor, $golesContra)
+    public function store(Request $request)
     {
-        $resultado = Resultado::where([
-            'equipo_id' => $equipoId,
-            'temporada_id' => $temporadaId,
-        ])->first();
+        $validated = $request->validate([
+            'fecha_id' => 'required|exists:fechas,id',
+            'equipo_local_id' => 'required|different:equipo_visitante_id',
+            'equipo_visitante_id' => 'required',
+        ]);
 
-        if (!$resultado) {
-            return; // No hay estadísticas para revertir
+        $fecha = Fecha::findOrFail($validated['fecha_id']);
+
+        Partido::create([
+            'fecha_id' => $validated['fecha_id'],
+            'temporada_id' => $fecha->temporada_id,
+            'equipo_local_id' => $validated['equipo_local_id'],
+            'equipo_visitante_id' => $validated['equipo_visitante_id'],
+            'goles_local' => null,
+            'goles_visitante' => null,
+        ]);
+
+        return back()->with('success', 'Partido creado correctamente.');
+    }
+
+    /**
+     * ==========================================
+     * ELIMINA UN PARTIDO
+     * ==========================================
+     */
+    public function destroy($id)
+    {
+        $partido = Partido::findOrFail($id);
+        
+        // Solo revertir si el partido tenía resultado
+        if ($partido->goles_local !== null && $partido->goles_visitante !== null) {
+            $this->revertirEstadisticasEquipos($partido, $partido->goles_local, $partido->goles_visitante);
+            
+            // Para jugadores, necesitarías saber sus estadísticas en este partido
+            // Sin tabla intermedia, no es posible revertir con precisión
+        }
+        
+        $partido->delete();
+
+        return back()->with('success', 'Partido eliminado correctamente.');
+    }
+
+    /**
+     * ==========================================
+     * LIMPIA TODOS LOS PARTIDOS DE UNA TEMPORADA
+     * ==========================================
+     */
+    public function limpiarPartidos($temporadaId)
+    {
+        $partidos = Partido::where('temporada_id', $temporadaId)->get();
+
+        foreach ($partidos as $partido) {
+            if ($partido->goles_local !== null && $partido->goles_visitante !== null) {
+                $this->revertirEstadisticasEquipos($partido, $partido->goles_local, $partido->goles_visitante);
+            }
+            $partido->delete();
         }
 
-        // Decrementar contadores
-        $resultado->partidos_jugados -= 1;
-        $resultado->goles_favor -= $golesFavor;
-        $resultado->goles_contra -= $golesContra;
+        // Resetear todas las estadísticas de jugadores de la temporada
+        JugadorEstadisticaTemporada::where('temporada_id', $temporadaId)->delete();
+        EquipoEstadisticaTemporada::where('temporada_id', $temporadaId)->delete();
 
-        // Revertir resultado del partido
-        if ($golesFavor > $golesContra) {
-            $resultado->partidos_ganados -= 1;
-        } elseif ($golesFavor === $golesContra) {
-            $resultado->partidos_empatados -= 1;
-        } else {
-            $resultado->partidos_perdidos -= 1;
-        }
-
-        // Si no quedan partidos, eliminar el registro
-        if ($resultado->partidos_jugados <= 0) {
-            $resultado->delete();
-        } else {
-            $resultado->save();
-        }
+        return back()->with('success', 'Todos los partidos de la temporada han sido eliminados correctamente.');
     }
 }

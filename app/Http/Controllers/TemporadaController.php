@@ -69,7 +69,7 @@ class TemporadaController extends Controller
         $equipos = Equipo::orderBy('NombreEquipos')->get();
         $temporadas = Temporada::orderBy('created_at', 'desc')->get();
 
-        return view('admin.temporada_editar', compact('temporada', 'equipos', 'temporadas'));
+        return view('admin.temporada_nueva', compact('temporada', 'equipos', 'temporadas'));
     }
 
     // Actualizar temporada y sus equipos

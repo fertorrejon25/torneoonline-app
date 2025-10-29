@@ -5,7 +5,7 @@
 @section('content')
     <!-- Mensajes de éxito y errores -->
     <div id="alertas"></div>
-    
+
     <!-- Errores de validación -->
     @if ($errors->any())
         <div class="alert alert-danger">
@@ -16,7 +16,7 @@
             </ul>
         </div>
     @endif
-    
+
     @if (session('success'))
         <div class="alert alert-success">
             {{ session('success') }}
@@ -28,45 +28,42 @@
             {{ session('error') }}
         </div>
     @endif
-    
+
     <div class="row">
         <!-- Formulario de creación -->
         <div class="col-md-9">
-            <form id="formTemporada" method="POST" action="{{ route('temporada.store') }}">
+            <form id="formTemporada" method="POST" action="{{ route('admin.temporada.store') }}">
                 @csrf
                 <div class="row">
                     <!-- Nombre de la Temporada -->
                     <div class="col-md-6">
                         <div class="mb-2">
-                            <input type="text"
-                                   class="form-control @error('nombretemporada') is-invalid @enderror"
-                                   placeholder="Nombre de la temporada (Ej: Temporada 2025)"
-                                   name="nombretemporada"
-                                   value="{{ old('nombretemporada') }}"
-                                   required>
+                            <input type="text" class="form-control @error('nombretemporada') is-invalid @enderror"
+                                placeholder="Nombre de la temporada (Ej: Temporada 2025)" name="nombretemporada"
+                                value="{{ old('nombretemporada') }}" required>
                             @error('nombretemporada')
                                 <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
-                        
+
                         <label class="form-label mt-3 mb-2">Seleccionar Equipos</label>
-                        <select name="equipos[]"
-                                class="form-control @error('equipos') is-invalid @enderror"
-                                multiple
-                                size="8"
-                                required>
+                        <div class="border rounded p-3" style="max-height: 250px; overflow-y: auto;">
                             @foreach ($equipos as $equipo)
-                                <option value="{{ $equipo->id }}" 
-                                        @if(in_array($equipo->id, old('equipos', []))) selected @endif>
-                                    {{ $equipo->NombreEquipos }}
-                                </option>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="equipos[]" value="{{ $equipo->id }}"
+                                        id="equipo_{{ $equipo->id }}" {{ in_array($equipo->id, old('equipos', [])) ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="equipo_{{ $equipo->id }}">
+                                        {{ $equipo->NombreEquipos }}
+                                    </label>
+                                </div>
                             @endforeach
-                        </select>
-                        <small class="text-muted d-block mt-2">Mantén presionado Ctrl (o Cmd en Mac) para seleccionar múltiples</small>
+                        </div>
+                        <small class="text-muted d-block mt-2">Podés seleccionar varios marcando las casillas</small>
+
                         @error('equipos')
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
-                        
+
                         <div class="mt-3 d-flex justify-content-end">
                             <button type="submit" class="btn btn-primary">Crear Temporada</button>
                         </div>
@@ -80,7 +77,7 @@
     @if (!empty($temporadas) && count($temporadas) > 0)
         <hr class="my-5">
         <h4 class="mb-4">Temporadas Cargadas</h4>
-        
+
         <div class="table-responsive">
             <table class="table table-hover">
                 <thead class="table-light">
@@ -92,10 +89,8 @@
                 </thead>
                 <tbody>
                     @foreach ($temporadas as $temporada)
-                        <tr>
-                            <td>
-                                <strong>{{ $temporada->NombreTemporada }}</strong>
-                            </td>
+                        <tr id="temporada-{{ $temporada->id }}">
+                            <td><strong>{{ $temporada->NombreTemporada }}</strong></td>
                             <td>
                                 @if ($temporada->equipos->count() > 0)
                                     <small class="badge bg-info">{{ $temporada->equipos->count() }} equipo(s)</small>
@@ -110,25 +105,11 @@
                             </td>
                             <td>
                                 <div class="btn-group" role="group">
-                                    <a href="{{ route('temporada.show', $temporada->id) }}"
-                                       class="btn btn-sm btn-info"
-                                       title="Ver detalles">
-                                        Ver
-                                    </a>
-                                    <a href="{{ route('temporada.edit', $temporada->id) }}"
-                                       class="btn btn-sm btn-warning"
-                                       title="Editar">
-                                        Editar
-                                    </a>
-                                    <form action="{{ route('temporada.destroy', $temporada->id) }}"
-                                          method="POST"
-                                          style="display:inline;"
-                                          onsubmit="return confirm('¿Estás seguro de que deseas eliminar esta temporada?');">
+                                    <a href="{{ route('admin.temporada.show', $temporada->id) }}" class="btn btn-sm btn-info">Ver</a>
+                                    <form class="form-eliminar" action="{{ route('temporada.destroy', $temporada->id) }}" method="POST" style="display:inline;">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger" title="Eliminar">
-                                            Eliminar
-                                        </button>
+                                        <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
                                     </form>
                                 </div>
                             </td>
@@ -138,8 +119,81 @@
             </table>
         </div>
     @else
-        <div class="alert alert-info mt-4">
-            No hay temporadas creadas aún.
-        </div>
+        <div class="alert alert-info mt-4">No hay temporadas creadas aún.</div>
     @endif
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar eliminación de temporadas con AJAX
+    const formsEliminar = document.querySelectorAll('.form-eliminar');
+    
+    formsEliminar.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (!confirm('¿Estás seguro de que deseas eliminar esta temporada?')) {
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const url = this.action;
+            const temporadaId = url.split('/').pop();
+            
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Eliminar la fila de la tabla
+                    const fila = document.getElementById(`temporada-${temporadaId}`);
+                    if (fila) {
+                        fila.remove();
+                    }
+                    
+                    // Mostrar mensaje de éxito
+                    mostrarMensaje('Temporada eliminada correctamente', 'success');
+                    
+                    // Si no quedan temporadas, recargar la página para mostrar el mensaje de "No hay temporadas"
+                    const filasRestantes = document.querySelectorAll('tbody tr');
+                    if (filasRestantes.length === 0) {
+                        location.reload();
+                    }
+                } else {
+                    mostrarMensaje(data.message || 'Error al eliminar la temporada', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error al eliminar la temporada', 'danger');
+            });
+        });
+    });
+    
+    function mostrarMensaje(mensaje, tipo) {
+        const alertasDiv = document.getElementById('alertas');
+        const alerta = document.createElement('div');
+        alerta.className = `alert alert-${tipo} alert-dismissible fade show`;
+        alerta.innerHTML = `
+            ${mensaje}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        alertasDiv.appendChild(alerta);
+        
+        // Auto-eliminar después de 5 segundos
+        setTimeout(() => {
+            if (alerta.parentNode) {
+                alerta.remove();
+            }
+        }, 5000);
+    }
+});
+</script>
+@endpush

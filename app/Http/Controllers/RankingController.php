@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\Temporada;
 use App\Models\Equipo;
 use Illuminate\Http\Request;
@@ -9,16 +10,24 @@ class RankingController extends Controller
 {
     public function index()
     {
-        // Obtener equipos ORDENADOS
-        $equipos = Equipo::orderBy('NombreEquipos')->get();
+        // Obtener todas las temporadas con sus equipos y estadísticas
+        $temporadas = Temporada::with(['equipos.estadisticasTemporada' => function($query) {
+            $query->orderBy('puntos', 'DESC')
+                  ->orderBy('diferencia_goles', 'DESC');
+        }])->get();
 
-        // Obtener la temporada más reciente
-        $temporada = Temporada::orderBy('created_at', 'desc')->first();
+        return view('admin.ranking', compact('temporadas'));
+    }
 
-        // Pasar a la vista de forma EXPLÍCITA
-        return view('admin.ranking', [
-            'equipos' => $equipos,
-            'temporada' => $temporada  // ⬅️ Cambiado de temporada_activa a temporada
-        ]);
+    public function show($temporadaId)
+    {
+        // Mostrar ranking de una temporada específica
+        $temporada = Temporada::with(['equipos.estadisticasTemporada' => function($query) use ($temporadaId) {
+            $query->where('temporada_id', $temporadaId)
+                  ->orderBy('puntos', 'DESC')
+                  ->orderBy('diferencia_goles', 'DESC');
+        }])->findOrFail($temporadaId);
+
+        return view('admin.ranking.show', compact('temporada'));
     }
 }
