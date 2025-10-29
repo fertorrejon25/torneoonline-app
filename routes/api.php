@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Models\Equipo;
 use App\Http\Controllers\Api\EquipoController;
+use App\Http\Controllers\Api\RankingController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -28,3 +29,8 @@ Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
 
 
 Route::get('/equipos', [EquipoController::class, 'index']);
+
+
+
+Route::get('/ranking', [RankingController::class, 'index']);
+Route::get('/ranking/{temporadaId}', [RankingController::class, 'show']);
