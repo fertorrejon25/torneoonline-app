@@ -42,10 +42,7 @@
                     {{-- Mostrar tabla de posiciones --}}
                     @if(isset($temporadaActual) && isset($equipos) && $equipos->count() > 0)
                         @php
-                            // Crear array combinado de equipos con sus estadísticas
                             $equiposConEstadisticas = [];
-                            
-                            // Primero añadir equipos que tienen estadísticas
                             if(isset($tablaPosiciones) && $tablaPosiciones->count() > 0) {
                                 foreach($tablaPosiciones as $estadistica) {
                                     $equiposConEstadisticas[$estadistica->equipo->id] = [
@@ -55,8 +52,6 @@
                                     ];
                                 }
                             }
-                            
-                            // Luego añadir equipos que no tienen estadísticas
                             foreach($equipos as $equipo) {
                                 if(!isset($equiposConEstadisticas[$equipo->id])) {
                                     $equiposConEstadisticas[$equipo->id] = [
@@ -66,11 +61,8 @@
                                     ];
                                 }
                             }
-                            
-                            // Ordenar por puntos (si tienen) o alfabéticamente
                             usort($equiposConEstadisticas, function($a, $b) {
                                 if ($a['tiene_estadisticas'] && $b['tiene_estadisticas']) {
-                                    // Ordenar por puntos, luego por diferencia de goles
                                     if ($b['estadistica']->puntos != $a['estadistica']->puntos) {
                                         return $b['estadistica']->puntos - $a['estadistica']->puntos;
                                     }
@@ -108,8 +100,6 @@
                                             $equipo = $data['equipo'];
                                             $tieneEstadisticas = $data['tiene_estadisticas'];
                                             $estadistica = $data['estadistica'];
-                                            
-                                            // Valores por defecto para equipos sin estadísticas
                                             $pj = $tieneEstadisticas ? $estadistica->partidos_jugados : 0;
                                             $pg = $tieneEstadisticas ? $estadistica->partidos_ganados : 0;
                                             $pe = $tieneEstadisticas ? $estadistica->partidos_empatados : 0;
@@ -139,13 +129,13 @@
                                             <td class="align-middle">
                                                 <div class="d-flex align-items-center">
                                                     @if($equipo->FotoEquipo)
-                                                        <img src="{{ asset('storage/' . $equipo->FotoEquipo) }}" 
-                                                             alt="{{ $equipo->NombreEquipos }}" 
-                                                             class="rounded-circle me-2" 
+                                                        <img src="{{ asset('storage/' . $equipo->FotoEquipo) }}"
+                                                             alt="{{ $equipo->NombreEquipos }}"
+                                                             class="me-2 img-square"
                                                              width="35" height="35"
                                                              style="object-fit: cover;">
                                                     @else
-                                                        <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" 
+                                                        <div class="bg-light img-placeholder d-flex align-items-center justify-content-center me-2"
                                                              style="width: 35px; height: 35px;">
                                                             <i class="fas fa-users text-muted"></i>
                                                         </div>
@@ -182,7 +172,6 @@
                         </div>
 
                     @elseif(isset($temporadaActual) && (!isset($equipos) || $equipos->count() == 0))
-                        {{-- CASO: Temporada existe pero NO tiene equipos --}}
                         <div class="text-center py-5">
                             <i class="fas fa-users-slash fa-4x text-muted mb-3"></i>
                             <h4 class="text-muted">No hay equipos en {{ $temporadaActual->NombreTemporada }}</h4>
@@ -196,9 +185,7 @@
                                 </a>
                             </div>
                         </div>
-
                     @else
-                        {{-- CASO: No hay temporada seleccionada --}}
                         <div class="text-center py-5">
                             <i class="fas fa-trophy fa-4x text-muted mb-3"></i>
                             <h4 class="text-muted">Selecciona una temporada</h4>
@@ -227,4 +214,29 @@ function cambiarTemporada(temporadaId) {
     }
 }
 </script>
+@endpush
+
+@push('styles')
+<style>
+img.img-square {
+    width: 35px !important;
+    height: 35px !important;
+    object-fit: cover;
+    border-radius: 0 !important;
+    display: inline-block;
+    border: none !important; /* ✅ sin borde */
+}
+
+.img-placeholder {
+    width: 35px !important;
+    height: 35px !important;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0 !important;
+    overflow: hidden;
+    border: none !important; /* ✅ sin borde */
+}
+</style>
 @endpush

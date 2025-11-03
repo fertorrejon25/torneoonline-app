@@ -32,3 +32,4 @@ class RankingController extends Controller
         return response()->json($ranking);
     }
 }
+

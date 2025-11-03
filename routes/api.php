@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Models\Equipo;
 use App\Http\Controllers\Api\EquipoController;
 use App\Http\Controllers\Api\RankingController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -20,14 +21,7 @@ Route::middleware(['auth:sanctum'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
-
-/***api para mostrar el escudo de los equipos */
-/*Route::get('/api/equipos', function () {
-    return response()->json(Equipo::all());
-});*/
-
-
-
+/**** para la api equipos y ranking */
 Route::get('/equipos', [EquipoController::class, 'index']);
 
 

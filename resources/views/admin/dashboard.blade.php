@@ -15,10 +15,7 @@
     @elseif ($section === 'temporada')
         @include('admin.temporada_nueva')
 
-    {{-- Muestra la vista para cargar resultados --}}
-    @elseif ($section === 'resultados')
-        @include('admin.resultados')
-
+    
     {{-- Muestra la tabla de posiciones --}}
     @elseif ($section === 'ranking')
         <div class="container-fluid">

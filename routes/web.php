@@ -36,10 +36,9 @@ Route::middleware('auth')->group(function () {
     // Redirección por rol
     Route::get('/redirigir-por-rol', function () {
         $user = Auth::user();
-        if ($user->role === 'admin') {
-            return redirect()->route('admin.dashboard');
-        }
-        return redirect()->route('user.dashboard');
+        return $user->role === 'admin'
+            ? redirect()->route('admin.dashboard')
+            : redirect()->route('user.dashboard');
     })->name('redirigir.por.rol');
 
     // Logout
@@ -47,11 +46,35 @@ Route::middleware('auth')->group(function () {
 });
 
 // ==========================================
-// RUTAS DE USUARIO NORMAL
+// RUTAS DE USUARIO NORMAL (JUGADOR)
 // ==========================================
-Route::middleware(['auth', 'role:user'])->group(function () {
-    Route::get('/user/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
-});
+Route::middleware(['auth', 'role:user'])->prefix('user')->group(function () {
+
+    // Dashboard principal con parámetro section
+    Route::get('/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
+
+    // Atajos semánticos (opcionales)
+    Route::get('/mi-carnet', fn() => redirect()->route('user.dashboard', ['section' => 'mi-carnet']))->name('user.mi-carnet');
+    Route::get('/historico', fn() => redirect()->route('user.dashboard', ['section' => 'historico']))->name('user.historico');
+    Route::get('/temporada-actual', fn() => redirect()->route('user.dashboard', ['section' => 'temporada-actual']))->name('user.temporada-actual');
+    Route::get('/ranking-historico', fn() => redirect()->route('user.dashboard', ['section' => 'ranking-historico']))->name('user.ranking-historico');
+
+    // Máximos (usuario) - vistas dedicadas
+    Route::get('/maximos-goleadores', [UserController::class, 'maximosGoleadores'])
+        ->name('user.maximos_goleadores');
+    Route::get('/maximos-asistentes', [UserController::class, 'maximosAsistentes'])
+        ->name('user.maximos_asistentes');
+
+
+    Route::get('/dashboard', [UserController::class, 'dashboard'])->name('user.dashboard');
+    Route::get('/ranking-historico', fn() => redirect()->route('user.dashboard', ['section' => 'ranking-historico']))->name('user.ranking-historico');
+
+    Route::get('/maximos-goleadores', [UserController::class, 'maximosGoleadores'])->name('user.maximos_goleadores');
+    Route::get('/maximos-asistentes', [UserController::class, 'maximosAsistentes'])->name('user.maximos_asistentes');
+
+    Route::get('/maximos-goleadores-historico', [UserController::class, 'maximosGoleadoresHistorico'])->name('user.maximos_goleadores_historico');
+    Route::get('/maximos-asistentes-historico', [UserController::class, 'maximosAsistentesHistorico'])->name('user.maximos_asistentes_historico');
+}); // <-- CIERRE DEL GRUPO DE USUARIO
 
 // ==========================================
 // RUTAS DE ADMINISTRADOR
@@ -84,33 +107,22 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('/fechas/store', [FechaController::class, 'store'])->name('fechas.store');
     Route::delete('/fechas/{id}', [FechaController::class, 'destroy'])->name('fechas.destroy');
 
-    // ==========================================
-    // RUTAS DE PARTIDOS - ORDEN CORRECTO
-    // ==========================================
+    // Partidos (orden correcto)
     Route::prefix('partidos')->group(function () {
-        // Crear partido
         Route::post('/store', [PartidosController::class, 'store'])->name('partidos.store');
 
-        // Edición detallada - ESTA ES LA RUTA QUE DEBES USAR PARA VER EL FORMULARIO
         Route::get('/{partido}/edit_detailed', [PartidosController::class, 'editDetailed'])
             ->name('admin.partidos.edit_detailed');
 
-        // Actualización detallada - ESTA RUTA SOLO ACEPTA PUT PARA ENVIAR EL FORMULARIO
         Route::put('/{partido}/update_detailed', [PartidosController::class, 'updateDetailed'])
             ->name('admin.partidos.update_detailed');
 
-        // Eliminar partido
         Route::delete('/{partido}', [PartidosController::class, 'destroy'])
             ->name('partidos.destroy');
 
-        // Limpiar partidos
         Route::delete('/limpiar/{temporadaId}', [PartidosController::class, 'limpiarPartidos'])
             ->name('partidos.limpiar');
     });
-
-    // ==========================================
-    // OTRAS RUTAS ESPECÍFICAS (agrega aquí cualquier otra ruta específica)
-    // ==========================================
 
     // ⚠️ RUTA COMODÍN - DEBE SER SIEMPRE LA ÚLTIMA
     Route::get('/{section?}', [AdminController::class, 'dashboard'])->name('admin.catchall');

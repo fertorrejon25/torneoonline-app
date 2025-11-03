@@ -4,17 +4,12 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@yield('title', 'Panel Admin')</title>
-
-    <!-- Bootstrap -->
+    <title>@yield('title', 'Panel del Jugador')</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
-          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
-          crossorigin="anonymous">
-
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* ===========================
-           RESET GENERAL
-        ============================ */
+        /* Reset completo */
         * {
             margin: 0;
             padding: 0;
@@ -22,20 +17,18 @@
         }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: Arial;
             overflow-x: hidden;
             background-color: #e2e2e2;
         }
 
-        /* ===========================
-           LAYOUT PRINCIPAL
-        ============================ */
+        /* Layout principal */
         .main-container {
             display: flex;
             min-height: 100vh;
         }
 
-        /* ----- MENÚ LATERAL ----- */
+        /* Menú lateral - Fijo y estable */
         .menu-lateral {
             background-color: #f8f9fa;
             padding: 20px 15px;
@@ -60,9 +53,10 @@
             text-align: left;
             padding: 12px 15px;
             border-radius: 8px;
-            font-weight: bold;
-            border: 1px solid #ced4da;
+            font-weight: 500;
             transition: all 0.3s ease;
+            border: 1px solid #ced4da;
+            font-weight: bold;
         }
 
         .menu-lateral .btn:hover {
@@ -74,6 +68,7 @@
             background-color: #198754;
             color: white;
             border-color: #198754;
+            font-weight: bold;
         }
 
         .menu-lateral .btn-logout {
@@ -81,6 +76,7 @@
             background-color: #dc3545;
             color: white;
             border: none;
+            font-weight: bold;
         }
 
         .menu-lateral .btn-logout:hover {
@@ -88,7 +84,7 @@
             transform: translateX(5px);
         }
 
-        /* ----- CONTENIDO PRINCIPAL ----- */
+        /* Contenido principal */
         .contenedor-principal {
             flex: 1;
             background-color: #e2e2e2;
@@ -98,6 +94,7 @@
             width: calc(100% - 280px);
         }
 
+        /* Estilos para el contenido específico */
         .content-wrapper {
             background: white;
             border-radius: 10px;
@@ -106,65 +103,7 @@
             min-height: calc(100vh - 60px);
         }
 
-        /* ===========================
-           IMÁGENES CUADRADAS
-        ============================ */
-        img, .card img, .table img {
-            border-radius: 0 !important;   /* Forzar sin redondeo */
-        }
-
-        /* Escudos grandes (equipos) */
-        .img-square-80 {
-            width: 80px;
-            height: 80px;
-            object-fit: contain;
-            border-radius: 0 !important;
-            border: 1px solid #000;
-        }
-
-        /* Fotos de jugadores pequeñas */
-        .img-square-30 {
-            width: 30px;
-            height: 30px;
-            object-fit: cover;
-            border-radius: 0 !important;
-            border: 1px solid #000;
-        }
-
-        /* Imagen cuadrada genérica (por si se usa en otras vistas) */
-        .img-square {
-            aspect-ratio: 1 / 1;
-            object-fit: cover;
-            border-radius: 0 !important;
-            border: 1px solid #000;
-        }
-
-        /* Estilo para los contenedores de foto (como en alta de jugador) */
-        .foto-jugador {
-            background-color: white;
-            width: 150px;
-            height: 150px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border: 1px solid #000;
-            margin-bottom: 10px;
-            overflow: hidden;
-            position: relative;
-            cursor: pointer;
-            text-align: center;
-            border-radius: 8px;
-        }
-
-        .foto-jugador img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        /* ===========================
-           RESPONSIVE
-        ============================ */
+        /* Responsive */
         @media (max-width: 768px) {
             .menu-lateral {
                 width: 100%;
@@ -172,19 +111,19 @@
                 position: relative;
                 min-height: auto;
             }
-
+            
             .contenedor-principal {
                 margin-left: 0;
                 width: 100%;
                 padding: 15px;
             }
-
+            
             .main-container {
                 flex-direction: column;
             }
         }
 
-        /* Scrollbar personalizado */
+        /* Scrollbar personalizado para el menú */
         .menu-lateral::-webkit-scrollbar {
             width: 6px;
         }
@@ -202,6 +141,7 @@
             background: #a8a8a8;
         }
     </style>
+    @stack('styles')
 </head>
 
 <body>
@@ -209,27 +149,23 @@
         <!-- Menú lateral fijo -->
         <nav class="menu-lateral">
             <div class="d-grid">
-                <a href="{{ route('admin.dashboard', ['section' => 'temporadacargadas']) }}" 
-                   class="btn btn-outline-dark {{ request('section') == 'temporadacargadas' ? 'btn-active' : '' }}">
-                   📊 Administrar Temporada
+                <a href="{{ route('user.dashboard', ['section' => 'mi-carnet']) }}" 
+                   class="btn btn-outline-dark {{ ($section ?? '') == 'mi-carnet' ? 'btn-active' : '' }}">
+                   👤 Mi Carnet de Jugador
                 </a>
-                <a href="{{ route('admin.dashboard', ['section' => 'ranking']) }}" 
-                   class="btn btn-outline-dark {{ request('section') == 'ranking' ? 'btn-active' : '' }}">
-                   🏆 Rankings
+                <a href="{{ route('user.dashboard', ['section' => 'historico']) }}" 
+                   class="btn btn-outline-dark {{ ($section ?? '') == 'historico' ? 'btn-active' : '' }}">
+                   📊 Carnet del Club
                 </a>
-                <a href="{{ route('admin.dashboard', ['section' => 'temporada']) }}" 
-                   class="btn btn-outline-dark {{ request('section') == 'temporada' ? 'btn-active' : '' }}">
-                   🆕 Crear Nueva Temporada
+                <a href="{{ route('user.dashboard', ['section' => 'temporada-actual']) }}" 
+                   class="btn btn-outline-dark {{ ($section ?? '') == 'temporada-actual' ? 'btn-active' : '' }}">
+                   🏆 Rankings Temporadas
                 </a>
-                <a href="{{ route('admin.dashboard', ['section' => 'equipos']) }}" 
-                   class="btn btn-outline-dark {{ request('section') == 'equipos' ? 'btn-active' : '' }}">
-                   ⚽ Alta de Equipos
+                <a href="{{ route('user.dashboard', ['section' => 'ranking-historico']) }}" 
+                   class="btn btn-outline-dark {{ ($section ?? '') == 'ranking-historico' ? 'btn-active' : '' }}">
+                   📈 Ranking Histórico
                 </a>
-                <a href="{{ route('admin.dashboard', ['section' => 'jugadores']) }}" 
-                   class="btn btn-outline-dark {{ request('section') == 'jugadores' ? 'btn-active' : '' }}">
-                   👤 Alta Jugadores
-                </a>
-                
+
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button type="submit" class="btn btn-logout">🚪 Cerrar sesión</button>

@@ -192,10 +192,4 @@ public function maximosAsistentes(Request $request)
                 ->with('error', 'Ocurrió un error al crear la temporada: ' . $e->getMessage());
         }
     }
-
-    public function administrarTemporada()
-    {
-        $temporadas = Temporada::with('equipos')->get();
-        return view('admin.temporadas', compact('temporadas'));
-    }
 }

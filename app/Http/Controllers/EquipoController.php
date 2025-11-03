@@ -34,10 +34,4 @@ class EquipoController extends Controller
 
         return back()->with('success', 'Equipo guardado correctamente.');
     }
-    //para la api equipos
-     public function index()
-    {
-        return response()->json(Equipo::all());
-    }
-
 }
